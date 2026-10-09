@@ -1,0 +1,24 @@
+{
+  "resource-1": {
+    "hours": 8,
+    "days": "1,2,3,4,5",
+    "role": "Analyst",
+    "skills": [
+      "data",
+      "reporting"
+    ],
+    "purpose": "Delivery planning",
+    "review": "2027-04-09"
+  },
+  "resource-2": {
+    "hours": 6,
+    "days": "1,2,3,4,5",
+    "role": "Analyst",
+    "skills": [
+      "data",
+      "reporting"
+    ],
+    "purpose": "Delivery planning",
+    "review": "2027-04-09"
+  }
+}

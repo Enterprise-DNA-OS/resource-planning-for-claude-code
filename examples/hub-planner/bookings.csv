@@ -1,0 +1,4 @@
+_id,resource,project,start,end,allDay,state,stateValue,type,note
+booking-1,resource-1,project-1,2026-10-12,2026-10-16,true,STATE_DAY_MINUTE,240,SCHEDULED,Data preparation
+booking-2,resource-2,project-1,2026-10-12,2026-10-16,true,STATE_PERCENTAGE,50,WAITING_FOR_APPROVAL,Provisional allocation
+booking-3,resource-2,project-1,2026-10-19,2026-10-23,true,STATE_TOTAL_MINUTE,600,SCHEDULED,Review pack

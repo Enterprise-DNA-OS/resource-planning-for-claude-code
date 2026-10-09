@@ -1,43 +1,50 @@
-# Resource Planning for Claude Code: operating instructions
+# Resource Planning for Claude Code
 
-This file is the brain. Claude Code reads it at the start of every session. It says who this is for, how work gets done, and the one right way to do each recurring job.
+A resource planning ledger for a professional-services team. Five rituals: review capacity, reconcile time off, allocate named people, fill staffing gaps and compare actual effort with the plan. The Harbour Consulting seed is fictional.
 
-## Who this is for
+Read current data before every answer. Never invent availability, hours, an approval or a staffing agreement. Actor names are attribution, not authentication. Confirm an allocation with its owner before recording it. Local mode supports one process. Shared use requires authenticated operators, restricted database roles and protected backups. Never expose the database owner connection to a browser.
 
-- **Business:** [YOUR BUSINESS]
-- **Operator:** [YOUR NAME], [your role]
-- **What matters most:** [the one or two outcomes you care about]
+Read docs/replace-hub-planner.md before importing and docs/compliance.md before explaining checks. The importer preserves the original fields and refuses changed source records. Work calendars are explicit. Requests cover Monday to Friday, and candidates must cover every requested day. Direct bookings follow the person's configured days. Calendar dates are inclusive. Time off reduces capacity but does not erase existing commitments.
 
-Fill this in once. A worker with context knows. A worker without it guesses.
+No sends, external vendor calls, payroll, employment entitlements or background workers. Do not record medical details in time-off notes. Drafts and exports remain private. If a record is ambiguous, show candidates and ask. Every runtime uses the same command library.
 
-## How to work
+## Recurring jobs
 
-1. **Take a brief, not a script.** The operator describes the outcome. You run the right command and present the answer.
-2. **Read before you write.** Before drafting anything about a record, read its full history first.
-3. **Plain language.** Short sentences. No filler. Numbers in tables.
-4. **Silent success, loud problems.** No play-by-play. Say what broke and what you did about it.
-5. **Stop at the line.** Anything that sends, deletes, or faces a customer waits for a yes in this session.
-
-## Routing table: one right way for each recurring job
-
-| When the operator asks for... | Use this |
+| Job | Recipe |
 |---|---|
-| <!-- TODO(author): one row per slash command --> | `/...` |
+| Read resource calendars and skills | /people |
+| Review project owners, budgets and hours | /projects |
+| Read confirmed, tentative and cancelled assignments | /bookings |
+| Prepare the next four weeks of capacity | /capacity |
+| Find days with more commitments than available hours | /overbooked |
+| Find weeks with no confirmed work | /bench |
+| Read planned time away | /time-off |
+| Review open and filled staffing requests | /requests |
+| Find people who fit a staffing request | /candidates |
+| Review recorded effort | /actuals |
+| Compare planned and actual project hours | /variance |
+| Find overload, stale staffing requests and overdue reviews | /attention |
+| Check retention reviews and internal capacity rules | /compliance |
+| Read a project and its assignments | /project |
+| Read the recorded changes to one item | /history |
+| Write the Monday resourcing meeting | /weekly-review |
+| Record a person and their working calendar | /add-person |
+| Open a project with an owner and hours budget | /add-project |
+| Record an agreed assignment after checking capacity | /book |
+| Cancel an assignment and keep its history | /cancel-booking |
+| Record confirmed time away or a public holiday | /add-time-off |
+| Cancel time away and restore capacity | /cancel-time-off |
+| Request a role and skill for a date range | /request-capacity |
+| Assign a suitable person to a staffing request | /fill-request |
+| Record verified hours worked | /log-time |
+| Record a planning note | /log |
+| Record a retention purpose and next review date | /review-data |
+| Bring across Hub Planner account exports | /import |
+| Save a complete private record snapshot | /export |
+| Draft the capacity meeting without sending | /draft-capacity |
+| Add a field or change a rule | /customise |
+| Add an offline report | /new-view |
 
-If an ask fits nothing here, run the CLI directly (`npm run <cli> -- --help`) and then propose a new command for it.
+One CLI: scripts/plan.mjs. Every command accepts --json. Mutations require --actor and accept --dry-run. Read docs/cli.md for examples. CLAUDE.md and AGENTS.md are the shared entry points for Claude Code, Codex, OpenCode and Cursor.
 
-## Hard rules
-
-- Never send email or messages from here. Draft to `drafts/`, a person sends.
-- Never delete records without an explicit yes in this session. Prefer marking closed or archived.
-- Never invent a record. If a name is ambiguous, list the candidates and ask.
-- The database is the source of truth. If the answer is not in it, say so.
-
-## Where things live
-
-- `scripts/` the CLI. `scripts/lib/db.mjs` picks `DATABASE_URL` (Postgres, Supabase) or the embedded database in `.data/`.
-- `supabase/migrations/` the schema, plain SQL. `npm run migrate` applies it.
-- `.claude/commands/` the slash commands. Add one every time the same ask comes twice.
-- `docs/` the thesis and the guide for moving off Hub Planner.
-
-Built by Enterprise DNA. Installed and run for you as part of Omni: https://enterprisedna.co/omni/instead-of/hub-planner
+Omni by Enterprise DNA installs, customises and runs this system. https://enterprisedna.co/omni/book/?offer=replace-software&utm_campaign=hub-planner&utm_medium=instructions

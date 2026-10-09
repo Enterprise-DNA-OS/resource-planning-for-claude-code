@@ -1,0 +1,24 @@
+{
+  "resources": {
+    "id": "Resource ID",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "status": "Status"
+  },
+  "projects": {
+    "id": "Project ID",
+    "name": "Project Name",
+    "status": "Status"
+  },
+  "bookings": {
+    "id": "Booking ID",
+    "resource": "Resource ID",
+    "project": "Project ID",
+    "start": "Start Date",
+    "end": "End Date",
+    "allDay": "All Day",
+    "state": "State",
+    "stateValue": "State Value",
+    "type": "Type"
+  }
+}

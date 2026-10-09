@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import {getDb,REPO_ROOT} from './lib/db.mjs';
+import {table} from './lib/format.mjs';
+import {importHubPlanner} from './lib/import.mjs';
+export const commands=['help','people','projects','bookings','capacity','overbooked','bench','time-off','requests','candidates','actuals','variance','attention','compliance','project','history','weekly-review','add-person','add-project','book','cancel-booking','add-time-off','cancel-time-off','request-capacity','fill-request','log-time','log','review-data','import','export','draft-capacity'];
+const readQueries={
+ people:'select id,name,role,skills,daily_hours,work_days,active from people order by name',
+ projects:'select * from project_totals order by name',
+ bookings:`select b.id,p.name person,j.name project,b.start_on,b.end_on,b.daily_hours,b.status,b.note from bookings b join people p on p.id=b.person_id join projects j on j.id=b.project_id order by b.start_on,p.name`,
+ capacity:'select name,role,week,capacity_hours,confirmed_hours,tentative_hours,free_hours,worst_day_free_hours from resource_week order by week,name',
+ overbooked:'select name,work_date,capacity_hours,confirmed_hours,free_hours from capacity_next_month where free_hours<0 order by work_date,name',
+ bench:'select name,role,week,free_hours,worst_day_free_hours from resource_week where confirmed_hours=0 and capacity_hours>0 order by week,name',
+ 'time-off':'select a.id,p.name,a.start_on,a.end_on,a.daily_hours,a.note,a.status from absences a join people p on p.id=a.person_id order by a.start_on,p.name',
+ requests:'select * from request_queue order by start_on,project',
+ actuals:'select a.id,p.name person,j.name project,a.worked_on,a.hours,a.note from actuals a join people p on p.id=a.person_id join projects j on j.id=a.project_id order by a.worked_on,p.name',
+ variance:'select name,budget_hours,planned_hours,planned_to_date,actual_to_date,actual_to_date-planned_to_date variance_hours,budget_remaining from project_totals order by name',
+ compliance:'select * from record_checks order by rule,subject,finding',
+ attention:`select * from record_checks union all select 'INTERNAL-inactive-request',id,project,'Request untouched for seven days' from request_queue where status='open' and id in(select id from requests where updated_at<now()-interval '7 days') order by rule,subject`
+};
+const collections=['people','projects','bookings','absences','requests','actuals','activity'];
+export function options(args){const out={}; for(const a of args){if(!a.startsWith('--'))continue; const i=a.indexOf('=');const k=a.slice(2,i<0?undefined:i);if(k in out)throw Error(`Duplicate flag --${k}`);out[k]=i<0?true:a.slice(i+1);} return out;}
+export function required(o,k){if(typeof o[k]!=='string'||!o[k].trim())throw Error(`--${k}=value is required`); return o[k].trim();}
+export function number(v,label,min=0,max=1e8){if(v===undefined||v===null||String(v).trim()==='')throw Error(`${label} is required`); const n=Number(v); if(!Number.isFinite(n)||n<min||n>max)throw Error(`Invalid ${label}`);return n;}
+export function date(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v))||new Date(`${v}T00:00:00Z`).toISOString().slice(0,10)!==v)throw Error(`Invalid calendar date: ${v}`);return v;}
+export function range(o){const a=date(required(o,'start')),b=date(required(o,'end'));if(b<a||(Date.parse(b)-Date.parse(a))/86400000>730)throw Error('Date range must be ordered and at most 731 days');return[a,b];}
+function tags(v){return [...new Set(String(v||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean))];}
+export function workDays(v){const x=String(v).split(',').map(n=>number(n,'work day',1,7));if(x.some(n=>!Number.isInteger(n))||new Set(x).size!==x.length)throw Error('Work days must be distinct integers 1 to 7');return x;}
+export async function resolve(db,kind,ref){if(!collections.includes(kind))throw Error('Unknown record type');const hasName=['people','projects'].includes(kind);const rows=await db.query(`select * from ${kind} where id::text=$1 ${hasName?'or lower(name)=lower($1)':''}`,[ref]);if(rows.length===1)return rows[0];const candidates=await db.query(`select * from ${kind} where starts_with(id::text,$1) ${hasName?'or position(lower($1) in lower(name))>0':''} order by id`,[ref]);if(candidates.length!==1){const e=Error(candidates.length?'Ambiguous record; choose an id from candidates':'No matching record');e.candidates=candidates.map(x=>({id:x.id,name:x.name||x.note||x.role||''}));throw e;}return candidates[0];}
+export async function audit(db,id,actor,action,detail){await db.query('insert into activity(entity_id,actor,action,detail) values($1,$2,$3,$4)',[id,actor,action,JSON.stringify(detail)]);}
+export async function insert(db,t,data){const keys=Object.keys(data);return(await db.query(`insert into ${t}(${keys.join(',')}) values(${keys.map((_,i)=>'$'+(i+1)).join(',')}) returning *`,Object.values(data)))[0];}
+async function candidates(db,q){return db.query(`select p.id,p.name,p.role,min(c.free_hours) minimum_free_hours,min(c.free_hours-c.tentative_hours) free_after_tentative,
+ count(*) working_days from people p join capacity_between($1,$2) c on c.person_id=p.id
+ where lower(p.role)=lower($3) and ($4='' or $4=any(p.skills)) and p.work_days <@ array[1,2,3,4,5] and extract(isodow from c.work_date)<=5
+ group by p.id,p.name,p.role having min(c.free_hours)>=$5 and count(*)=(select count(*) from generate_series($1::timestamp,$2::timestamp,interval '1 day') d where extract(isodow from d)<=5) order by minimum_free_hours desc,p.name`,[q.start_on,q.end_on,q.role,q.skill,q.daily_hours]);}
+async function checkBooking(db,p,j,start,end,hours,status){if(!p.active)throw Error('Person is inactive');if(j.status==='closed')throw Error('Project is closed');const days=await db.query('select * from capacity_between($1,$2) where person_id=$3',[start,end,p.id]);if(!days.length)throw Error('No working days in range');if(status==='confirmed'&&days.some(d=>Number(d.free_hours)<hours))throw Error('Confirmed booking exceeds daily capacity; resolve existing bookings or time off first');}
+export async function run(db,args){const cmd=args[0]||'help',o=options(args.slice(1)); if(!commands.includes(cmd))throw Error(`Unknown command: ${cmd}`);
+ if(cmd==='help')return commands.map(command=>({command,reference:'docs/cli.md'}));
+ if(readQueries[cmd])return db.query(readQueries[cmd]);
+ if(cmd==='candidates')return candidates(db,await resolve(db,'requests',required(o,'request')));
+ if(cmd==='project'){const p=await resolve(db,'projects',required(o,'project'));return {project:p,totals:await db.query('select * from project_totals where id=$1',[p.id]),bookings:await db.query('select * from bookings where project_id=$1 order by start_on',[p.id]),actuals:await db.query('select * from actuals where project_id=$1 order by worked_on',[p.id])};}
+ if(cmd==='history'){const row=await resolve(db,required(o,'kind'),required(o,'id'));return db.query('select actor,action,detail,created_at from activity where entity_id=$1 order by created_at,id',[row.id]);}
+ if(cmd==='weekly-review'){const out={};for(const k of ['capacity','requests','attention'])out[k]=await db.query(readQueries[k]);return out;}
+ if(cmd==='export'){const out={format:'resource-planning-v1',exported_at:new Date().toISOString()};for(const t of collections)out[t]=await db.query(`select * from ${t} order by id`);const dir=path.join(REPO_ROOT,'exports');mkdirSync(dir,{recursive:true});const file=path.join(dir,`records-${randomUUID()}.json`);writeFileSync(file,JSON.stringify(out,null,2),{mode:0o600});return {file,counts:Object.fromEntries(collections.map(t=>[t,out[t].length]))};}
+ if(cmd==='draft-capacity'){const data=await run(db,['weekly-review']);const dir=path.join(REPO_ROOT,'drafts');mkdirSync(dir,{recursive:true});const file=path.join(dir,`capacity-${randomUUID()}.md`);writeFileSync(file,`# Draft capacity meeting\n\nFor internal review. Confirm commitments with the project owners.\n\n${JSON.stringify(data,null,2)}\n`,{mode:0o600});return {file,sent:false};}
+ const actor=required(o,'actor');await db.exec('BEGIN');
+ try{await db.query("select pg_advisory_xact_lock(731904)");let result;
+ if(cmd==='import'){if(args[1]!=='hub-planner')throw Error('Use import hub-planner');result=await importHubPlanner(db,o,actor);}
+ else if(cmd==='add-person'){result=await insert(db,'people',{name:required(o,'name'),role:required(o,'role'),skills:tags(o.skills),daily_hours:number(required(o,'hours'),'hours',0.01,24),work_days:workDays(o.days||'1,2,3,4,5'),retention_purpose:required(o,'purpose'),review_on:date(required(o,'review'))});}
+ else if(cmd==='add-project'){result=await insert(db,'projects',{name:required(o,'name'),client:required(o,'client'),owner:required(o,'owner'),budget_hours:number(required(o,'budget-hours'),'budget hours')});}
+ else if(cmd==='book'){const p=await resolve(db,'people',required(o,'person')),j=await resolve(db,'projects',required(o,'project')),[start,end]=range(o),hours=number(required(o,'hours'),'hours',0.01,24),status=o.status||'confirmed';if(!['confirmed','tentative'].includes(status))throw Error('Use confirmed or tentative status');await checkBooking(db,p,j,start,end,hours,status);result=await insert(db,'bookings',{person_id:p.id,project_id:j.id,start_on:start,end_on:end,daily_hours:hours,status,note:required(o,'note')});}
+ else if(cmd==='cancel-booking'){const b=await resolve(db,'bookings',required(o,'booking'));if(b.status==='cancelled')throw Error('Already cancelled');result=(await db.query("update bookings set status='cancelled',note=note||E'\nCancelled: '||$2 where id=$1 returning *",[b.id,required(o,'reason')]))[0];await db.query("update requests set status='open',booking_id=null where booking_id=$1",[b.id]);}
+ else if(cmd==='add-time-off'){const p=await resolve(db,'people',required(o,'person')),[start,end]=range(o);result=await insert(db,'absences',{person_id:p.id,start_on:start,end_on:end,daily_hours:number(required(o,'hours'),'hours',0.01,24),note:required(o,'note')});}
+ else if(cmd==='cancel-time-off'){const a=await resolve(db,'absences',required(o,'absence'));if(a.status==='cancelled')throw Error('Already cancelled');result=(await db.query("update absences set status='cancelled',note=note||E'\\nCancelled: '||$2 where id=$1 returning *",[a.id,required(o,'reason')]))[0];}
+ else if(cmd==='request-capacity'){const j=await resolve(db,'projects',required(o,'project')),[start,end]=range(o);if(j.status==='closed')throw Error('Project is closed');result=await insert(db,'requests',{project_id:j.id,role:required(o,'role'),skill:String(o.skill||'').toLowerCase(),start_on:start,end_on:end,daily_hours:number(required(o,'hours'),'hours',0.01,24),owner:required(o,'owner')});}
+ else if(cmd==='fill-request'){const q=await resolve(db,'requests',required(o,'request'));if(q.status!=='open')throw Error('Request already filled');const p=await resolve(db,'people',required(o,'person'));if(!(await candidates(db,q)).some(c=>c.id===p.id))throw Error('Person lacks the role, skill or daily capacity');const j=await resolve(db,'projects',q.project_id);await checkBooking(db,p,j,q.start_on,q.end_on,Number(q.daily_hours),'confirmed');const b=await insert(db,'bookings',{person_id:p.id,project_id:q.project_id,start_on:q.start_on,end_on:q.end_on,daily_hours:q.daily_hours,note:required(o,'note')});await audit(db,b.id,actor,'book-from-request',{request:q.id});result=(await db.query("update requests set status='filled',booking_id=$2 where id=$1 returning *",[q.id,b.id]))[0];}
+ else if(cmd==='log-time'){const p=await resolve(db,'people',required(o,'person')),j=await resolve(db,'projects',required(o,'project'));const day=date(required(o,'date')),hours=number(required(o,'hours'),'hours',0.01,24);const [{today,total}]=await db.query('select current_date::text today,coalesce(sum(hours),0) total from actuals where person_id=$1 and worked_on=$2',[p.id,day]);if(day>today||Number(total)+hours>24)throw Error('Actual time cannot be in the future or exceed 24 hours per person per day');result=await insert(db,'actuals',{person_id:p.id,project_id:j.id,worked_on:day,hours,note:required(o,'note')});}
+ else if(cmd==='review-data'){const p=await resolve(db,'people',required(o,'person'));result=(await db.query('update people set retention_purpose=$2,review_on=$3 where id=$1 returning *',[p.id,required(o,'purpose'),date(required(o,'review'))]))[0];}
+ else if(cmd==='log'){const kind=required(o,'kind');if(!['people','projects','bookings','requests'].includes(kind))throw Error('Use people, projects, bookings or requests');const row=await resolve(db,kind,required(o,'id'));result={id:row.id,note:required(o,'note')};}
+ else throw Error('Command not implemented');
+ if(cmd!=='import')await audit(db,result.id,actor,cmd,result);
+ if(o['dry-run'])await db.exec('ROLLBACK');else await db.exec('COMMIT');return o['dry-run']?{dry_run:true,result}:result;
+ }catch(e){await db.exec('ROLLBACK');throw e;}
+}
+export function display(x){if(Array.isArray(x)){if(!x.length)return '(none)';const rows=x.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,Array.isArray(v)?v.join(', '):v&&typeof v==='object'?JSON.stringify(v):v])));return table(rows,Object.keys(rows[0]).map(key=>({key,label:key,width:80})));}return JSON.stringify(x,null,2);}
+if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){let db;try{db=await getDb();const x=await run(db,process.argv.slice(2));console.log(process.argv.includes('--json')?JSON.stringify(x,null,2):display(x));}catch(e){console.error(process.argv.includes('--json')?JSON.stringify({error:e.message,candidates:e.candidates||[]}):e.message+(e.candidates?'\n'+display(e.candidates):''));process.exitCode=1;}finally{if(db)await db.close();}}

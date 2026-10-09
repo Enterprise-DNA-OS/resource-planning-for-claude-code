@@ -1,11 +1,38 @@
 [
   {
-    "name": "example",
-    "title": "TODO(author): the first document this industry must produce",
-    "for_each": "select gen_random_uuid() as id, 'Example' as name",
+    "name": "project-resource-plan",
+    "title": "Project resource plan",
+    "for_each": "select id,name from projects order by name",
     "file": "name",
     "sections": [
-      { "title": "Details", "sql": "select 'replace me' as item, $1::text as record_id" }
+      {
+        "title": "Accountability and hours",
+        "sql": "select name,client,owner,budget_hours,planned_hours,actual_to_date,budget_remaining from project_totals where id=$1"
+      },
+      {
+        "title": "Named commitments",
+        "sql": "select p.name,b.start_on,b.end_on,b.daily_hours,b.status,b.note from bookings b join people p on p.id=b.person_id where project_id=$1 order by start_on,p.name"
+      },
+      {
+        "title": "Staffing still needed",
+        "sql": "select role,skill,start_on,end_on,daily_hours,owner from requests where project_id=$1 and status='open'"
+      }
+    ]
+  },
+  {
+    "name": "staffing-brief",
+    "title": "Staffing request brief",
+    "for_each": "select q.id,p.name from requests q join projects p on p.id=q.project_id",
+    "file": "name",
+    "sections": [
+      {
+        "title": "Required role and dates",
+        "sql": "select project,role,skill,start_on,end_on,daily_hours,owner,status from request_queue where id=$1"
+      },
+      {
+        "title": "Decision history",
+        "sql": "select actor,action,detail,created_at from activity where entity_id=$1 order by created_at,id"
+      }
     ]
   }
 ]

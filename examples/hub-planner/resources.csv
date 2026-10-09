@@ -1,0 +1,3 @@
+_id,firstName,lastName,status,email
+resource-1,Robin,Chen,STATUS_ACTIVE,robin@example.invalid
+resource-2,Alex,Rangi,STATUS_ACTIVE,alex@example.invalid

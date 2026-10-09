@@ -1,115 +1,81 @@
-<h1 align="center">Resource Planning for Claude Code</h1>
+# Resource Planning for Claude Code
 
-<p align="center">
-  <strong>The open-source resource planning system that is just a database and Claude Code.</strong>
-</p>
+Know who can take the work, which days no longer fit and which projects are using more hours than planned. An MIT-licensed resource planning database and command set. Works with Claude Code, Codex, OpenCode or Cursor.
 
-<p align="center">
-  Created by <a href="https://www.enterprisedna.co"><strong>Enterprise DNA</strong></a>. Free and open source. Works with Claude Code, Codex, OpenCode or Cursor.
-</p>
+| Do it yourself | We customise it | We run it for you |
+|---|---|---|
+| Free. Try the demo and import Hub Planner account records. | Your fields, calendars, rules, history, web front end or different stack. | Installed, connected and operated through Omni by Enterprise DNA. One setup fee, then a retainer. |
+| [Quick start](#quick-start) | [Get your version built](https://enterprisedna.co/omni/book/?offer=replace-software&utm_campaign=hub-planner&utm_medium=customise) | [Book a call](https://enterprisedna.co/omni/book/?offer=replace-software&utm_campaign=hub-planner&utm_medium=managed) |
 
-<!-- three-doors -->
-<table align="center">
-  <tr>
-    <td align="center"><strong>Do it yourself</strong><br/>Clone it, run it, own it. Free, MIT.<br/><a href="#quick-start">Quick start</a></td>
-    <td align="center"><strong>We customise it</strong><br/>Your fields, your rules, your Hub Planner data brought across.<br/><a href="https://enterprisedna.co/omni/book/?utm_source=github&utm_medium=readme&utm_campaign=hub-planner">Book a call</a></td>
-    <td align="center"><strong>We run it for you</strong><br/>Installed, connected and operated inside Omni. Setup fee, then a retainer.<br/><a href="https://enterprisedna.co/omni/instead-of/hub-planner?utm_source=github&utm_medium=readme&utm_campaign=hub-planner">How it works</a></td>
-  </tr>
-</table>
+## The Monday capacity meeting
 
-<p align="center">
-  <a href="#what-is-this">What is this</a> &bull;
-  <a href="#why-no-front-end">Why no front end</a> &bull;
-  <a href="#quick-start">Quick start</a> &bull;
-  <a href="#the-commands">Commands</a> &bull;
-  <a href="#instead-of-hub-planner">Instead of Hub Planner</a> &bull;
-  <a href="#want-it-installed-and-run-for-you">Installed for you</a> &bull;
-  <a href="#license">License</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Node-20+-339933?style=flat-square" alt="Node 20+" />
-  <img src="https://img.shields.io/badge/PostgreSQL-any-336791?style=flat-square" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/PGlite-embedded-3ecf8e?style=flat-square" alt="PGlite" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" />
-</p>
-
----
-
-## What is this
-
-Resource Planning for Claude Code does the job you pay Hub Planner for, as a Postgres database and a set of agent commands. There is no web front end. You open the folder in [Claude Code](https://claude.com/claude-code) (or Codex, OpenCode, Cursor: see `AGENTS.md`) and ask for what you want in plain language. It runs the right query, and it can answer questions the Hub Planner dashboard cannot.
-
-<!-- TODO(author): the annual bill. One sentence: what a 10 to 50 person business typically pays Hub Planner per year, all in, with a source. -->
-
-Want the same thing with a web front end, or built on a different stack? That is a customisation, and it is exactly what Enterprise DNA does: [book a call](https://enterprisedna.co/omni/book/?utm_source=github&utm_medium=readme&utm_campaign=hub-planner).
-
-<!-- TODO(author): two or three sentences on what this specific product covers and who it is for. -->
-
-## Why no front end
-
-- The front end was only ever there because the database was hard to talk to. That is no longer true.
-- Your data sits in plain Postgres tables you own. Any tool can read them. No export, no lock-in.
-- No seats, no tiers, no add-ons. Read [docs/why-no-front-end.md](docs/why-no-front-end.md) for the honest trade-offs too.
+Five rituals: review available hours, reconcile time off, allocate named people, fill staffing gaps and compare actual effort with the plan. The fictional Harbour Consulting demo includes competing commitments, a part-time analyst on leave, tentative work, an overdue staffing request and a retention review.
 
 ## Quick start
 
-Sixty seconds, no database install (an embedded Postgres runs inside Node):
+Node 20 or later on Windows or Linux:
 
 ```bash
 git clone https://github.com/Enterprise-DNA-OS/resource-planning-for-claude-code.git
 cd resource-planning-for-claude-code
 npm install
 npm run demo
+npm test
+npm run view
+npm run docs
+npm run plan -- candidates --request=50000000
 ```
 
-Then open the folder in Claude Code and type a slash command. <!-- TODO(author): name the first command to try. -->
+The embedded PGlite database runs in .data/db. DATABASE_URL selects Postgres 15 or later with verified TLS. Local mode supports one process. For real records, select a fresh DATA_DIR and migrate without seeding. Keep fictional demo records separate. Shared use requires authenticated operators, restricted database roles and protected backups. The actor label records attribution, not identity verification.
 
-### Use it with your own Postgres or Supabase
+31 CLI commands including help and 32 slash recipes. [CLI reference](docs/cli.md).
 
-Copy `.env.example` to `.env`, set `DATABASE_URL`, then `npm run migrate`. Same commands, shared data, no per-seat fee.
+## Hours that mean what they say
 
-## The commands
+Direct bookings follow each person's configured workdays. Time off reduces capacity while leaving existing commitments visible. Confirmed and tentative allocations stay separate. The capacity report shows weekly totals and the worst individual day's headroom. New confirmed bookings that exceed daily availability are refused. Cancelling a filled request's booking reopens the staffing request.
 
-<!-- TODO(author): a table of the slash commands in .claude/commands and what each one does. -->
+Staffing requests cover Monday to Friday in the requested range. A candidate must cover every requested day, match the role and skill, and have enough confirmed headroom. The report also shows tentative commitments. A shortlist is not an agreement to do the work. Dates are inclusive and daily hours are uniform across a person's configured workdays. This base does not schedule time-of-day slots, calculate pay or track leave entitlements.
 
-| Command | What it does |
-|---|---|
-| `/...` | ... |
+## Ten questions beyond a fixed report
 
-## Instead of hub-planner
+Hub Planner offers reporting and capacity tools. These are questions the shipped queries answer, not unsupported claims that the incumbent cannot answer them.
 
-<!-- TODO(author): how to bring data across from Hub Planner; link docs/replace-hub-planner.md -->
+1. Which days are overloaded even when the weekly total looks manageable? `overbooked`
+2. Who fits the required skill and every weekday of an open staffing request? `candidates --request=50000000`
+3. Whose confirmed work clashes with recorded time off? `overbooked`
+4. Where do tentative assignments consume the apparent spare capacity? `capacity`
+5. Which people have whole weeks without confirmed work? `bench`
+6. Which staffing requests are already past their start date? `requests`
+7. Which requests have been untouched for a week? `attention`
+8. Which projects have recorded more hours than planned through today? `variance`
+9. Who has an overdue review of why we retain their personal records? `compliance`
+10. What was changed on an assignment, by whom and with what explanation? `history --kind=bookings --id=<id>`
 
-## Architecture
+## Your first hour: ten things to ask for
 
-```
-resource-planning-for-claude-code/
-  CLAUDE.md                 how the operator wants this run (routing table + house rules)
-  AGENTS.md                 the same, for Codex / OpenCode / Cursor / Gemini CLI
-  .claude/commands/         the slash commands
-  scripts/                  the CLI the commands drive
-  scripts/lib/db.mjs        one adapter: DATABASE_URL (pg) or embedded PGlite
-  supabase/migrations/      plain SQL schema
-  supabase/seed.sql         demo data
-  docs/                     the thesis and the migration guide
-```
+1. Put our business name, logo and colours on the project plan.
+2. Show which days are overloaded.
+3. Separate tentative work from committed work.
+4. Find someone who can take the reporting request.
+5. Record the time away the team has agreed.
+6. Draft our Monday capacity meeting.
+7. Check our export before importing it.
+8. Reconcile a part-time person's hours with the source.
+9. Add our delivery location through /customise.
+10. Add a client capacity report through /new-view.
 
-## Built for coding agents
+## Paperwork and reports
 
-The database, CLI and command recipes work with Claude Code, Codex, OpenCode or Cursor. Ask your coding agent for a new command and have it implement and test the change against the same records.
+brand.json controls business name, logo and colours. npm run docs produces project resource plans and staffing request briefs. npm run view produces the capacity meeting and staffing reports. They are read-only HTML snapshots, suitable for printing to PDF. Drafts stay in drafts/. Reports and exports contain private business records.
 
-## Contributing
+[Record checks](docs/compliance.md) cover retention-review prompts, missing project owners, daily overload and overdue staffing requests. [Why no front end](docs/why-no-front-end.md) explains how interactive timelines, mobile access and live shared scheduling fit a customised version.
 
-Issues and pull requests are welcome. Keep the shape: plain SQL, a small CLI, a slash command per recurring job, no front end.
+## Move from Hub Planner
 
-## Want it installed and run for you?
+Hub Planner now appears as Resource Flow on Milient's website. [The replacement guide](docs/replace-hub-planner.md) covers its CSV exports, explicit calendar mapping, supported allocation types, a dry run, repeat imports and reconciliation. The importer takes resource, project and all-day booking records in one command after their headings and calendars are mapped. It preserves original fields, refuses unknown states and leaves changed source records for review. Time entries, time off, holidays, rates, attachments and approval history need separate migration. Nothing calls or changes Hub Planner.
 
-Enterprise DNA installs Resource Planning for Claude Code for your business, migrates your Hub Planner data, connects it to the rest of your tools, and runs it for you as part of **Omni**, our managed Command Center. One setup fee, then a monthly retainer.
+## Verification
 
-- Book a call: [enterprisedna.co/omni/book](https://enterprisedna.co/omni/book/?offer=replace-software&utm_source=github&utm_medium=readme&utm_campaign=hub-planner)
-- Read more: [enterprisedna.co/omni/instead-of/hub-planner](https://enterprisedna.co/omni/instead-of/hub-planner?utm_source=github&utm_medium=readme&utm_campaign=hub-planner)
+npm test uses a temporary database and exercises every CLI command. It checks daily capacity, partial calendars, staffing, cancellation, actual-hour validation, attributed history, import rollback, duplicate and changed source records, all three allocation modes, exports, documents and reports. CI runs on Windows and Linux and against disposable Postgres. [Results](docs/verification.md).
 
-## License
-
-MIT. Copyright (c) 2026 Enterprise DNA.
+MIT licence. Not affiliated with Hub Planner, Milient or Anthropic. Hosting and coding-agent use carry their own costs. [Sources and target selection](docs/research.md). [Book 30 minutes with Sam](https://enterprisedna.co/omni/book/?offer=replace-software&utm_campaign=hub-planner&utm_medium=readme).
